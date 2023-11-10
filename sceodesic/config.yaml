@@ -1,0 +1,14 @@
+# parameters to set for sceodesic 
+# lines beginning with `#` are ignored. 
+
+num_clusters: 13
+num_hvg: 12
+sparse_pca_lambda: 0.0
+max_condition_number: 50
+
+stratify_clustering_by_columns: []
+filepath: ''
+
+num_hvg_per_cluster: 100
+pvd_pct: 0.90
+do_global_hvg: False
