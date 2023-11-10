@@ -11,25 +11,25 @@ This repository contains an implementation of the algorithm.  Some examples of u
 
 You can install Sceodesic by running the following in your command line:
 
-\```
+```
 git clone https://github.com/rohitsinghlab/sceodesic.git
 cd ./sceodesic  # to directory containing pyproject.toml file 
 pip install .
-\```
+```
 
 ## API Example Usage
 
 Below is example usage of sceodesic in Python. First, make sure your single-cell gene expression data is in an anndata object, as below.
 
-\```python
+```python
 import anndata
 
 adata = [single cell gene expression anndata object]
-\```
+```
 
 Now, you are ready to discover some programs!
 
-\```python
+```python
 from sceodesic import run_sceo
 
 run_sceo(adata, num_hvg=300)
@@ -38,14 +38,14 @@ embeddings = adata.obsm['sceo_embeddings']
 
 # programs (loadings) stored in .varm, as a numpy array
 programs = adata.varm['sceo_programs']
-\```
+```
 
 `embeddings` is a 2D numpy array where rows represent cells and columsn represent levels of gene program expression. `programs` is a 2D numpy array where columns represent individual gene programs, with each entry of that column giving the weight of each individual gene\ in that program. After you have generated programs and the embeddings, it becomes possible to do a wide variety of downstream single cell analysis using these embeddings.  For example, if our data is labelled by cell type with an `obs` column called "cell_type" , we can compute differential gene program expression across cell types as follows:
 
-\```python
+```python
 
 # Create new anndata object with embeddings
 adata_sceo = anndata.AnnData(embeddings, obs=adata.obs)
 
 sc.get.rank_genes_groups_df(adata = adata_sceo, group = “cell_type”)
-\```
+```
