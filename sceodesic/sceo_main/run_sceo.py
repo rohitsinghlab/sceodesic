@@ -19,7 +19,7 @@ from ..utils import order_by_second_moment
 
 
 @fn_timer
-def run_sceo(adata, num_cohorts=500, num_hvg=300, sparse_pca_lambda=0.03, 
+def run_sceo(adata, num_hvg, num_cohorts='auto', sparse_pca_lambda=0.03, 
              max_condition_number=50, stratify_cols='none', 
              num_hvg_per_cohort=100, pvd_pct=0.9, do_global_hvg=False, 
              copy=False, n_init=1, key_added=None, uns_key=None):
