@@ -32,6 +32,8 @@ def estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
             print(message, file=sys.stderr)
             
             raise e
+    else:
+        adata.uns[uns_key][hvg_key] = top_genes
             
     # can either pass in a cell cohort assignment (array cohort_assn with cell[i] having cluster assn cohort_assn[i])
     # or the cluster_key
@@ -49,7 +51,8 @@ def estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
         c2c = {}
         for i, c in enumerate(cohort_assn):
             c2c[c] = c2c.get(c, []) + [i]
-        clustering_results = {'cell2cluster': c2c}
+        clustering_results = {'cell2cluster': c2c, 'stratify_cols': '***NOT SPECIFIED***'}
+        adata.uns[uns_key].update(clustering_results)
     
     return _estimate_covariances(adata, max_condition_number, pvd_pct,
                                  copy, return_results, 

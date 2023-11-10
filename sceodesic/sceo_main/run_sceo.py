@@ -19,9 +19,10 @@ from ..utils import order_by_second_moment
 
 
 @fn_timer
-def run_sceo(adata, num_hvg, num_cohorts='auto', sparse_pca_lambda=0.03, 
+def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03, 
              max_condition_number=50, stratify_cols='none', 
              num_hvg_per_cohort=100, pvd_pct=0.9, do_global_hvg=False, 
+             cohort_assn=None, top_genes=None,
              copy=False, n_init=1, key_added=None, uns_key=None):
     """
     Computes sceodesic embeddings and saves them in adata.obsm[key_added], 
@@ -35,16 +36,17 @@ def run_sceo(adata, num_hvg, num_cohorts='auto', sparse_pca_lambda=0.03,
     
     :type adata: anndata.AnnData
     
+    :param num_hvg:
+        The final number of locally variable genes to select out of the union of 
+        locally variable genes across all cohorts. Must be specified unless top_genes 
+        is specified.
+    
+    :type num_hvg: int > 0
+    
     :param num_cohorts:
         The number of cell cohorts to create. Must be at least 10. 
     
     :type num_cohorts: int > 10
-        
-    :param num_hvg:
-        The final number of locally variable genes to select out of the union of 
-        locally variable genes across all cohorts. 
-    
-    :type num_hvg: int > 0
         
     :param sparse_pca_lambda:
         Sparsity parameter for sparse pca during module reconstruction. 
@@ -78,6 +80,20 @@ def run_sceo(adata, num_hvg, num_cohorts='auto', sparse_pca_lambda=0.03,
         rather than getting locally variable genes per cohort. 
     
     :type do_global_hvg: boolean 
+    
+    :param cohort_assn: 
+        Optionally, one can specify the cohort assignment rather than have them computed. 
+        If not specified, the cohort assignments will be computed according to the parameters 
+        num_cohorts, stratify_cols, num_hvg. 
+        
+    :type cohort_assn: np.array[str] of length n_cells
+    
+    :param top_genes:
+        If specified, use these genes as the gene set for estimating covariances and 
+        computing sceodesic programs. If not specified, will be computed according to 
+        the parameters num_hvg, num_hvg_per_cohort, and do_global_hvg. 
+        
+    :type top_genes: list[str]
     
     :param copy: 
         Return a copy of anndata if True 
@@ -119,10 +135,38 @@ def run_sceo(adata, num_hvg, num_cohorts='auto', sparse_pca_lambda=0.03,
     if copy:
         adata = adata.copy()
         
-    # run the four steps
-    get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
-    get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg, uns_key=uns_key)
-    estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
+    adata.uns[uns_key] = {}
+     
+    # can give cohort_assn or top_genes optionally
+    if cohort_assn is not None and top_genes is None:
+        num_cohorts = len(np.unique(cohort_assn))
+        stratify_cols = '***NOT SPECIFIED***'
+        get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg,
+                                   cohort_assn=cohort_assn, uns_key=uns_key) 
+        estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
+    elif cohort_assn is None and top_genes is not None:
+        num_hvg = len(top_genes)
+        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
+        estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, uns_key=uns_key)
+    elif cohort_assn is not None and top_genes is not None:
+        num_cohorts = len(np.unique(cohort_assn))
+        stratify_cols = '***NOT SPECIFIED***'
+        num_hvg = len(top_genes)
+        estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, 
+                             cohort_assn=cohort_assn, uns_key=uns_key)
+    else:
+        try:
+            assert num_hvg > 0
+        except Exception as e:
+            message = ("Error: you must either specify the number of variable genes to select"
+                       " or input your own list of genes of interest.")
+            print(message, file=sys.stderr)
+            raise e
+        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
+        get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg, uns_key=uns_key)
+        estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
+    
+    # will do the same thing here no matter which of cohort_assn/top_genes is pre-specified
     reconstruct_programs(adata, sparse_pca_lambda, uns_key=uns_key)
     
     # these are hard-coded for now (fix later)
