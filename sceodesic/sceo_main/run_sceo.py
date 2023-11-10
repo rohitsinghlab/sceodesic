@@ -155,6 +155,13 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
         estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, 
                              cohort_assn=cohort_assn, uns_key=uns_key)
     else:
+        try:
+            assert num_hvg > 0
+        except Exception as e:
+            message = ("Error: you must either specify the number of variable genes to select"
+                       " or input your own list of genes of interest.")
+            print(message, file=sys.stderr)
+            raise e
         get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
         get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg, uns_key=uns_key)
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
