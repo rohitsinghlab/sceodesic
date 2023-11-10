@@ -44,7 +44,7 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     #if 'auto', we set num_clusters = ncells/nhvg
     if num_clusters == 'auto': 
         try: 
-            num_clusters = int(adata.X.shape[0]*1.0/num_hvg)
+            num_clusters = _get_auto_num_clusters(adata, num_hvg=num_hvg)
         except Exception as e:
             print("Error: if num_clusters is 'auto', you must specify num_hvg.", file=sys.stderr)
             print(f"num_hvg is set to {num_hvg} and of type {type(num_hvg)}.", file=sys.stderr)
@@ -124,3 +124,11 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         out += (clustering_results_dict,)
     
     return out if len(out) > 1 else out[0] if len(out) == 1 else None
+
+
+def _get_auto_num_clusters(adata, *args, **kwargs):
+    print("automatically determining number of cohorts")
+    num_hvg = kwargs['num_hvg']
+    num_cohorts = int(adata.X.shape[0]*1.0/num_hvg)
+    print("number of cohorts:", num_cohorts)
+    return num_cohorts
