@@ -36,7 +36,8 @@ def get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster=100, global_h
         c2c = {}
         for i, c in enumerate(cohort_assn):
             c2c[c] = c2c.get(c, []) + [i]
-        clustering_results = {'cell2cluster': c2c}
+        clustering_results = {'cell2cluster': c2c, 'stratify_cols': '***NOT SPECIFIED***'}
+        adata.uns[uns_key].update(clustering_results)
         
     return _get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster, global_hvg, 
                                        copy=copy, return_results=return_results, 

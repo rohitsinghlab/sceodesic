@@ -112,8 +112,6 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
             pickle.dump(clustering_results_dict, f)
 
     # write to adata.uns 
-    if not uns_key in adata.uns: 
-        adata.uns[uns_key] = {}
     adata.uns[uns_key][cluster_key] = kmeans_cluster_dict
     adata.uns[uns_key][stratify_key] = stratify_cols
     
