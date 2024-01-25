@@ -12,32 +12,34 @@ from .default_keys import *
 
 @fn_timer
 def get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster=100, global_hvg=False,
-                               copy=False, return_results=False, cohort_assn=None, uns_key=None):
+                               copy=False, return_results=False, cohort_weights=None, uns_key=None):
     
     if uns_key is None:
         uns_key = UNS_KEY
+
+    if uns_key not in adata.uns:
+        adata.uns[uns_key] = {}
     
     # removing ability to specify key
     cluster_key = CLUSTER_KEY
     
-    # can either pass in a cell cohort assignment (array cohort_assn with cell[i] having cluster assn cohort_assn[i])
+    # can either pass in soft cell cohort 'assignment' (array cohort_weights with cell[i] having cluster weight cohort_weights[i])
     # or the cluster_key 
     clustering_results = None
-    if cohort_assn is None:
+    if cohort_weights is None:
         try:
-            clustering_results = adata.uns[uns_key]
-        except:
+            clustering_results = adata.obsm[adata.uns[uns_key]['obsm_cluster_assignment_key']]
+        except Exception as e:
             message = ("Error: must either specify a cell cohort assignment or "
                        "have run sceodesic.get_cell_cohorts beforehand.")
             print(message, file=sys.stderr)
             
             raise e
     else:
-        c2c = {}
-        for i, c in enumerate(cohort_assn):
-            c2c[c] = c2c.get(c, []) + [i]
-        clustering_results = {'cell2cluster': c2c, 'stratify_cols': '***NOT SPECIFIED***'}
-        adata.uns[uns_key].update(clustering_results)
+        clustering_metadata = {'obsm_cluster_assignment_key': 'cell2cluster', 'stratify_cols': '***NOT SPECIFIED***'}
+        adata.uns[uns_key].update(clustering_metadata)
+        adata.obsm['cell2cluster'] = cohort_weights
+        clustering_results = cohort_weights
         
     return _get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster, global_hvg, 
                                        copy=copy, return_results=return_results, 
@@ -60,11 +62,14 @@ def _get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster, global_hvg,
         
     # change later 
     results_clustering = clustering_results
-        
     
     # Store the cluster data matrices.
-    cell2cluster = results_clustering["cell2cluster"]
-    
+    c2c = results_clustering
+    c2c = np.argmax(c2c, axis=1).tolist()
+    cell2cluster = {}
+    for i, c in enumerate(c2c):
+        cell2cluster[c] = cell2cluster.get(c, []) + [i]
+
     full_data_clusters = []
     for key in cell2cluster.keys():
         cluster_indices = cell2cluster[key]

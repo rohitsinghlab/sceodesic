@@ -6,6 +6,7 @@ import pickle
 import numpy as np 
 import fbpca 
 from sklearn.cluster import KMeans
+from sklearn.mixture import GaussianMixture 
 
 # package-specific imports 
 from ..utils import fn_timer
@@ -29,6 +30,9 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     if uns_key is None:
         uns_key = UNS_KEY
         
+    if uns_key not in adata.uns:
+        adata.uns[uns_key] = {}
+
     if cluster_key is None:
         cluster_key = CLUSTER_KEY
         
@@ -37,7 +41,7 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         
     if copy:
         adata = adata.copy()
-        
+
     # should we get rid of this (ROHIT)
     assert num_clusters == 'auto' or num_clusters > 10
     
@@ -85,23 +89,23 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         
         group_num_clusters = max(1, int(float(group_adata.shape[0])/adata.shape[0] * num_clusters))
         
-        kmeans = KMeans(n_clusters=group_num_clusters, n_init=n_init)
+        kmeans = GaussianMixture(n_components=group_num_clusters, n_init=n_init)
         kmeans.fit(X_dimred)
         print(f"Fitting done k means with {group_num_clusters} clusters for stratification group {idx+1} '{strat_desc}'")
-        kmeans_cluster_assignments = kmeans.labels_
+        kmeans_cluster_assignments = kmeans.predict_proba(X_dimred)
         
         # save the kmeans model
         kmeans_models[strat_desc] = (kmeans, curr_cluster_count)
 
-        for i in range(group_num_clusters):
-            # save keys as strings so we can save to .h5ad
-            kmeans_cluster_dict[str(curr_cluster_count)] = orig_indices[np.where(kmeans_cluster_assignments == i)[0]].tolist()
-            curr_cluster_count += 1
+        # for i in range(group_num_clusters):
+            ## save keys as strings so we can save to .h5ad
+            # kmeans_cluster_dict[str(curr_cluster_count)] = orig_indices[np.where(kmeans_cluster_assignments == i)[0]].tolist()
+            # curr_cluster_count += 1
 
-    cnt_sizeLT10 = len([v for v in kmeans_cluster_dict.values() if len(v) < 10])
-    cnt_sizeLT50 = len([v for v in kmeans_cluster_dict.values() if len(v) < 50])
-    print(f'Finished clustering with {len(kmeans_cluster_dict)} clusters (originally intended {num_clusters}). Size < 10: {cnt_sizeLT10}, Size < 50: {cnt_sizeLT50}')    
-    clustering_results_dict = {"cell2cluster" : kmeans_cluster_dict, 
+    # cnt_sizeLT10 = len([v for v in kmeans_cluster_dict.values() if len(v) < 10])
+    # cnt_sizeLT50 = len([v for v in kmeans_cluster_dict.values() if len(v) < 50])
+    # print(f'Finished clustering with {len(kmeans_cluster_dict)} clusters (originally intended {num_clusters}). Size < 10: {cnt_sizeLT10}, Size < 50: {cnt_sizeLT50}')    
+    clustering_results_dict = {"cell2cluster" : kmeans_cluster_assignments, 
                                "cluster_pca_matrices": pca_results,
                                "kmeans_models": kmeans_models,
                                "stratify_cols": stratify_cols}
@@ -111,8 +115,9 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         with open(clustering_filename, 'wb') as f:
             pickle.dump(clustering_results_dict, f)
 
-    # write to adata.uns 
-    adata.uns[uns_key][cluster_key] = kmeans_cluster_dict
+    # write to adata
+    adata.obsm[cluster_key] = kmeans_cluster_assignments
+    adata.uns[uns_key]['obsm_cluster_assignment_key'] = 'cell2cluster'
     adata.uns[uns_key][stratify_key] = stratify_cols
     
     out = ()

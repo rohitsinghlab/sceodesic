@@ -1,5 +1,6 @@
 
 import scipy
+import numpy as np
 
 import pickle 
 import sys 
@@ -13,11 +14,14 @@ from .default_keys import *
 @fn_timer
 def estimate_covariances(adata, max_condition_number, pvd_pct=0.9, 
                          copy=False, return_results=False,
-                         top_genes=None, cohort_assn=None,
+                         top_genes=None, cohort_weights=None,
                          uns_key=None):
     
     if uns_key is None:
         uns_key = UNS_KEY
+
+    if uns_key not in adata.uns:
+        adata.uns[uns_key] = {}
     
     # not able to be passed in
     hvg_key = HVG_KEY
@@ -35,24 +39,23 @@ def estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
     else:
         adata.uns[uns_key][hvg_key] = top_genes
             
-    # can either pass in a cell cohort assignment (array cohort_assn with cell[i] having cluster assn cohort_assn[i])
-    # or the cluster_key
+    # can either pass in soft cell cohort 'assignment' (array cohort_weights with cell[i] having cluster weight cohort_weights[i])
+    # or the cluster_key 
     clustering_results = None
-    if cohort_assn is None: 
+    if cohort_weights is None:
         try:
-            clustering_results = adata.uns[uns_key]
-        except:
+            clustering_results = adata.obsm[adata.uns[uns_key]['obsm_cluster_assignment_key']]
+        except Exception as e:
             message = ("Error: must either specify a cell cohort assignment or "
                        "have run sceodesic.get_cell_cohorts beforehand.")
             print(message, file=sys.stderr)
             
             raise e
     else:
-        c2c = {}
-        for i, c in enumerate(cohort_assn):
-            c2c[c] = c2c.get(c, []) + [i]
-        clustering_results = {'cell2cluster': c2c, 'stratify_cols': '***NOT SPECIFIED***'}
-        adata.uns[uns_key].update(clustering_results)
+        clustering_metadata = {'obsm_cluster_assignment': 'cell2cluster', 'stratify_cols': '***NOT SPECIFIED***'}
+        adata.uns[uns_key].update(clustering_metadata)
+        adata.obsm['cell2cluster'] = cohort_weights
+        clustering_results = cohort_weights
     
     return _estimate_covariances(adata, max_condition_number, pvd_pct,
                                  copy, return_results, 
@@ -84,13 +87,11 @@ def _estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
     # change later 
     top_genes = top_genes
     results_clustering = results_clustering
-    
-    cell2cluster = results_clustering["cell2cluster"]
-    
     filtered_data = adata[:,top_genes]
-    
+
     # Get the clusters from the reduced data.
     clusters = {}
+    clusters_wts = {}
 
     processed_data = None
     if scipy.sparse.issparse(filtered_data.X):
@@ -98,14 +99,15 @@ def _estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
     else:
         processed_data = filtered_data.X
 
-    for key in cell2cluster.keys():
-        cluster_indices = cell2cluster[key]
-        clusters[key] = processed_data[cluster_indices,:]
+    for i in range(results_clustering.shape[1]):
+        cluster_indices = np.where(results_clustering[:, i] > 0.0)[0]
+        clusters[i] = processed_data[cluster_indices, :]
+        clusters_wts[i] = results_clustering[cluster_indices, i]
     
     cluster_covariances = {}
     cluster_var_count = {}  
     for i,cluster in clusters.items():
-        cluster_covar, var_count = compute_covariance_and_ncomps_pct_variance(cluster, max_condition_number, pvd_pct)
+        cluster_covar, var_count = compute_covariance_and_ncomps_pct_variance(cluster, max_condition_number, pvd_pct, clusters_wts[i])
         cluster_covariances[i] = cluster_covar # Ensures a PSD matrix.
         cluster_var_count[i] = var_count
 

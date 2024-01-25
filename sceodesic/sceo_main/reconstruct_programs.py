@@ -21,6 +21,9 @@ def reconstruct_programs(adata, sparse_pca_lambda,
     
     if uns_key is None:
         uns_key = UNS_KEY 
+
+    if uns_key not in adata.uns:
+        adata.uns[uns_key] = {}
         
     # get results_coexp from adata.uns if not specified 
     if results_coexp is None:
@@ -47,7 +50,7 @@ def _reconstruct_programs(adata, sparse_pca_lambda, embedding_filename=None,
     
     if uns_key is None:
         uns_key = UNS_KEY
-    
+
     if embeddings_dict_key is None:
         embeddings_dict_key = EMBEDDINGS_DICT_KEY 
     

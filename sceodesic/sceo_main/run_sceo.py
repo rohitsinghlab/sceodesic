@@ -22,7 +22,7 @@ from ..utils import order_by_second_moment
 def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03, 
              max_condition_number=50, stratify_cols='none', 
              num_hvg_per_cohort=100, pvd_pct=0.9, do_global_hvg=False, 
-             cohort_assn=None, top_genes=None,
+             cohort_weights=None, top_genes=None,
              copy=False, n_init=1, key_added=None, uns_key=None):
     """
     Computes sceodesic embeddings and saves them in adata.obsm[key_added], 
@@ -81,12 +81,12 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     
     :type do_global_hvg: boolean 
     
-    :param cohort_assn: 
+    :param cohort_weights: 
         Optionally, one can specify the cohort assignment rather than have them computed. 
         If not specified, the cohort assignments will be computed according to the parameters 
         num_cohorts, stratify_cols, num_hvg. 
         
-    :type cohort_assn: np.array[str] of length n_cells
+    :type cohort_weights: np.array[str] of length n_cells
     
     :param top_genes:
         If specified, use these genes as the gene set for estimating covariances and 
@@ -137,23 +137,23 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
         
     adata.uns[uns_key] = {}
      
-    # can give cohort_assn or top_genes optionally
-    if cohort_assn is not None and top_genes is None:
-        num_cohorts = len(np.unique(cohort_assn))
+    # can give cohort_weights or top_genes optionally
+    if cohort_weights is not None and top_genes is None:
+        num_cohorts = len(np.unique(cohort_weights))
         stratify_cols = '***NOT SPECIFIED***'
         get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg,
-                                   cohort_assn=cohort_assn, uns_key=uns_key) 
+                                   cohort_weights=cohort_weights, uns_key=uns_key) 
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
-    elif cohort_assn is None and top_genes is not None:
+    elif cohort_weights is None and top_genes is not None:
         num_hvg = len(top_genes)
         get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
         estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, uns_key=uns_key)
-    elif cohort_assn is not None and top_genes is not None:
-        num_cohorts = len(np.unique(cohort_assn))
+    elif cohort_weights is not None and top_genes is not None:
+        num_cohorts = len(np.unique(cohort_weights))
         stratify_cols = '***NOT SPECIFIED***'
         num_hvg = len(top_genes)
         estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, 
-                             cohort_assn=cohort_assn, uns_key=uns_key)
+                             cohort_weights=cohort_weights, uns_key=uns_key)
     else:
         try:
             assert num_hvg > 0
@@ -166,7 +166,7 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
         get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg, uns_key=uns_key)
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
     
-    # will do the same thing here no matter which of cohort_assn/top_genes is pre-specified
+    # will do the same thing here no matter which of cohort_weights/top_genes is pre-specified
     reconstruct_programs(adata, sparse_pca_lambda, uns_key=uns_key)
     
     # these are hard-coded for now (fix later)
@@ -175,19 +175,24 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     modules_key = MODULES_KEY
     hvg_key = HVG_KEY
     
-    cell2cluster = adata.uns[uns_key][cluster_key]
+    cluster_wts = adata.obsm['cell2cluster']
         
     embeddings = adata.uns[uns_key][embeddings_dict_key]
     modules = adata.uns[uns_key][modules_key]
     top_genes = adata.uns[uns_key][hvg_key]
-    
+
+    embeddings_matrix = np.zeros((num_hvg, cluster_wts.shape[1])).T
+    for i in embeddings:
+        embeddings_matrix[i, :] = embeddings[i]
+
     # making the .obsm object 
     observation_count = adata.n_obs    
-    data_embedding = np.zeros((observation_count, num_hvg))
-    for i, embed in embeddings.items():
-        cluster_indices = cell2cluster[i]
-        for cell in cluster_indices:
-            data_embedding[cell, :] = embed
+    data_embedding = cluster_wts @ embeddings_matrix
+    #data_embedding = np.zeros((observation_count, num_hvg))
+    #for i, embed in embeddings.items():
+        #cluster_indices = cell2cluster[i]
+        #for cell in cluster_indices:
+            #data_embedding[cell, :] = embed
             
     data_embedding, modules = order_by_second_moment(data_embedding, modules)
     
