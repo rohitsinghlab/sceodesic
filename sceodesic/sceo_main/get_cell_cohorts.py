@@ -11,18 +11,22 @@ from sklearn.mixture import GaussianMixture
 # package-specific imports 
 from ..utils import fn_timer
 from .default_keys import *
+from ..helper import threshold_membership_matrix 
 
 @fn_timer
 def get_cell_cohorts(adata, num_cohorts, stratify_cols='none', num_hvg=None, 
+                     threshold_function=threshold_membership_matrix,
                      copy=False, return_results=False, n_init=1, 
                      uns_key=None):
     
     return _get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, 
+                             threshold_function,
                              copy, return_results, n_init, 
                              uns_key=uns_key)
 
 
 def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg, 
+                      threshold_function,
                       copy, return_results, n_init, 
                       clustering_filename=None,
                       uns_key=None, cluster_key=None, stratify_key=None):
@@ -74,6 +78,9 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     # storing kmeans objects as well
     kmeans_models = {}
     
+    # cluster weights 
+    cluster_weights = np.zeros((adata.shape[0], num_clusters))
+    
     kmeans_cluster_dict = {}
     curr_cluster_count = 0
     for idx, (group_adata, orig_indices, strat_desc) in enumerate(groups):    
@@ -89,23 +96,25 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         
         group_num_clusters = max(1, int(float(group_adata.shape[0])/adata.shape[0] * num_clusters))
         
-        kmeans = GaussianMixture(n_components=group_num_clusters, n_init=n_init)
+        kmeans = GaussianMixture(n_components=group_num_clusters, n_init=n_init, covariance_type='diag')
         kmeans.fit(X_dimred)
         print(f"Fitting done k means with {group_num_clusters} clusters for stratification group {idx+1} '{strat_desc}'")
         kmeans_cluster_assignments = kmeans.predict_proba(X_dimred)
         
+        # thresholding
+        kmeans_cluster_assignments = threshold_function(kmeans_cluster_assignments)
+        
         # save the kmeans model
         kmeans_models[strat_desc] = (kmeans, curr_cluster_count)
 
-        # for i in range(group_num_clusters):
-            ## save keys as strings so we can save to .h5ad
-            # kmeans_cluster_dict[str(curr_cluster_count)] = orig_indices[np.where(kmeans_cluster_assignments == i)[0]].tolist()
-            # curr_cluster_count += 1
+        # save the cluster assignments
+        cluster_weights[orig_indices, curr_cluster_count:curr_cluster_count+group_num_clusters] = kmeans_cluster_assignments
+        curr_cluster_count += group_num_clusters
 
     # cnt_sizeLT10 = len([v for v in kmeans_cluster_dict.values() if len(v) < 10])
     # cnt_sizeLT50 = len([v for v in kmeans_cluster_dict.values() if len(v) < 50])
     # print(f'Finished clustering with {len(kmeans_cluster_dict)} clusters (originally intended {num_clusters}). Size < 10: {cnt_sizeLT10}, Size < 50: {cnt_sizeLT50}')    
-    clustering_results_dict = {"cell2cluster" : kmeans_cluster_assignments, 
+    clustering_results_dict = {"cell2cluster" : cluster_weights, 
                                "cluster_pca_matrices": pca_results,
                                "kmeans_models": kmeans_models,
                                "stratify_cols": stratify_cols}
@@ -116,7 +125,7 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
             pickle.dump(clustering_results_dict, f)
 
     # write to adata
-    adata.obsm[cluster_key] = kmeans_cluster_assignments
+    adata.obsm[cluster_key] = cluster_weights
     adata.uns[uns_key]['obsm_cluster_assignment_key'] = 'cell2cluster'
     adata.uns[uns_key][stratify_key] = stratify_cols
     
