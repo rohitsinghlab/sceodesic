@@ -90,8 +90,8 @@ def _estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
     filtered_data = adata[:,top_genes]
 
     # Get the clusters from the reduced data.
-    clusters = {}
-    clusters_wts = {}
+    clusters = [None for _ in range(results_clustering.shape[1])]
+    clusters_wts = [None for _ in range(results_clustering.shape[1])]
 
     processed_data = None
     if scipy.sparse.issparse(filtered_data.X):
@@ -106,7 +106,7 @@ def _estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
     
     cluster_covariances = {}
     cluster_var_count = {}  
-    for i,cluster in clusters.items():
+    for i, cluster in enumerate(clusters):
         cluster_covar, var_count = compute_covariance_and_ncomps_pct_variance(cluster, max_condition_number, pvd_pct, clusters_wts[i])
         cluster_covariances[i] = cluster_covar # Ensures a PSD matrix.
         cluster_var_count[i] = var_count

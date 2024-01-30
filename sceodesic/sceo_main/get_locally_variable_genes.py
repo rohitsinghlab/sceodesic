@@ -64,17 +64,8 @@ def _get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster, global_hvg,
     results_clustering = clustering_results
     
     # Store the cluster data matrices.
-    c2c = results_clustering
-    c2c = np.argmax(c2c, axis=1).tolist()
-    cell2cluster = {}
-    for i, c in enumerate(c2c):
-        cell2cluster[c] = cell2cluster.get(c, []) + [i]
-
-    full_data_clusters = []
-    for key in cell2cluster.keys():
-        cluster_indices = cell2cluster[key]
-        ## full_data_clusters.append(adata[cluster_indices,:])
-        full_data_clusters.append(cluster_indices)
+    c2c = np.argmax(results_clustering, axis=1)
+    ncluster = results_clustering.shape[1]
 
     if global_hvg:
         sc.pp.highly_variable_genes(adata, layer=None, n_top_genes=num_hvg)
@@ -83,10 +74,13 @@ def _get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster, global_hvg,
     else:
         # Now compute bottoms up hvgs.
         hvg_count_vec = np.zeros(adata.shape[1])
-        for i, clusterids in enumerate(full_data_clusters):
-            cluster = adata[clusterids,:].copy()
-            sc.pp.highly_variable_genes(cluster, layer=None, n_top_genes=num_hvg_per_cluster)
-            hvg_count_vec += np.where(cluster.var['highly_variable'], 1, 0)
+        for icluster in range(ncluster):
+            clusterids = np.where(c2c == icluster)[0]
+            hvg_calc = sc.pp.highly_variable_genes(adata[clusterids, :], 
+                                                   layer=None, 
+                                                   inplace=False, 
+                                                   n_top_genes=num_hvg_per_cluster)
+            hvg_count_vec += np.where(hvg_calc['highly_variable'], 1, 0)
 
         # select the indices of the first num_hvg highest values in hvg_count_vec
         top_gene_idxs =  np.argsort(hvg_count_vec)[-num_hvg:]
