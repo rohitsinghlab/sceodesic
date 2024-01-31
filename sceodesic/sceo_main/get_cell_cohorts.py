@@ -14,27 +14,21 @@ from .default_keys import *
 from ..helper import threshold_membership_matrix 
 from ..helper import compute_responsibilities
 
-# hard-coded default parameters
-VARIANCE_INFLATION_FACTOR = 1.0
-
 
 @fn_timer
 def get_cell_cohorts(adata, num_cohorts, stratify_cols='none', num_hvg=None, 
                      threshold_function=threshold_membership_matrix,
-                     variance_inflation_factor=VARIANCE_INFLATION_FACTOR,
                      copy=False, return_results=False, n_init=1, 
                      uns_key=None):
     
     return _get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, 
                              threshold_function,
-                             variance_inflation_factor,
                              copy, return_results, n_init, 
                              uns_key=uns_key)
 
 
 def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg, 
                       threshold_function,
-                      variance_inflation_factor,
                       copy, return_results, n_init, 
                       clustering_filename=None,
                       uns_key=None, cluster_key=None, stratify_key=None):
@@ -108,12 +102,8 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         kmeans.fit(X_dimred)
         print(f"Fitting done k means with {group_num_clusters} clusters for stratification group {idx+1} '{strat_desc}'")
 
-        precisions = kmeans.precisions_ / variance_inflation_factor
-        kmeans_cluster_assignments = compute_responsibilities(X_dimred, kmeans.weights_,
-                                                              kmeans.means_,
-                                                              precisions)
-
-        print('max discrepancy:', np.abs(kmeans_cluster_assignments - kmeans.predict_proba(X_dimred)).max())
+        # cluster assignment 
+        kmeans_cluster_assignments = kmeans.predict_proba(X_dimred)
         
         # thresholding
         kmeans_cluster_assignments = threshold_function(kmeans_cluster_assignments)
