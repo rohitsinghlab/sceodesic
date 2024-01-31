@@ -76,6 +76,7 @@ def _get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster, global_hvg,
         hvg_count_vec = np.zeros(adata.shape[1])
         for icluster in range(ncluster):
             clusterids = np.where(c2c == icluster)[0]
+            print('cluster', icluster, 'size', len(clusterids))
             hvg_calc = sc.pp.highly_variable_genes(adata[clusterids, :], 
                                                    layer=None, 
                                                    inplace=False, 
