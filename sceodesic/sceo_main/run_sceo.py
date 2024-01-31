@@ -175,7 +175,7 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     modules_key = MODULES_KEY
     hvg_key = HVG_KEY
     
-    cluster_wts = adata.obsm['cell2cluster']
+    cluster_wts = adata.uns[uns_key]['inflated_cluster_responsibilities']
         
     embeddings = adata.uns[uns_key][embeddings_dict_key]
     modules = adata.uns[uns_key][modules_key]

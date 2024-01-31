@@ -14,21 +14,26 @@ from .default_keys import *
 from ..helper import threshold_membership_matrix 
 from ..helper import compute_responsibilities
 
+VARIANCE_INFLATION_FACTOR = 10.0
+
 
 @fn_timer
 def get_cell_cohorts(adata, num_cohorts, stratify_cols='none', num_hvg=None, 
+                     variance_inflation_factor=VARIANCE_INFLATION_FACTOR,
                      threshold_function=threshold_membership_matrix,
                      copy=False, return_results=False, n_init=1, 
                      uns_key=None):
     
     return _get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, 
                              threshold_function,
+                             variance_inflation_factor,
                              copy, return_results, n_init, 
                              uns_key=uns_key)
 
 
 def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg, 
                       threshold_function,
+                      variance_inflation_factor,
                       copy, return_results, n_init, 
                       clustering_filename=None,
                       uns_key=None, cluster_key=None, stratify_key=None):
@@ -81,7 +86,8 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     kmeans_models = {}
     
     # cluster weights 
-    cluster_weights = np.zeros((adata.shape[0], num_clusters))
+    resps = np.zeros((adata.shape[0], num_clusters))
+    resps_inflated = np.zeros((adata.shape[0], num_clusters))
     
     kmeans_cluster_dict = {}
     curr_cluster_count = 0
@@ -111,14 +117,16 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         # save the kmeans model
         kmeans_models[strat_desc] = (kmeans, curr_cluster_count)
 
-        # save the cluster assignments
-        cluster_weights[orig_indices, curr_cluster_count:curr_cluster_count+group_num_clusters] = kmeans_cluster_assignments
+        # save the cluster assignments and parameter data
+        resps[orig_indices, curr_cluster_count:curr_cluster_count+group_num_clusters] = kmeans_cluster_assignments
+        resps_inflated[orig_indices, curr_cluster_count:curr_cluster_count+group_num_clusters] = threshold_function(compute_responsibilities(X_dimred, kmeans.weights_, kmeans.means_, kmeans.precisions_ / variance_inflation_factor))
         curr_cluster_count += group_num_clusters
+
 
     # cnt_sizeLT10 = len([v for v in kmeans_cluster_dict.values() if len(v) < 10])
     # cnt_sizeLT50 = len([v for v in kmeans_cluster_dict.values() if len(v) < 50])
     # print(f'Finished clustering with {len(kmeans_cluster_dict)} clusters (originally intended {num_clusters}). Size < 10: {cnt_sizeLT10}, Size < 50: {cnt_sizeLT50}')    
-    clustering_results_dict = {"cell2cluster" : cluster_weights, 
+    clustering_results_dict = {"cell2cluster" : resps, 
                                "cluster_pca_matrices": pca_results,
                                "kmeans_models": kmeans_models,
                                "stratify_cols": stratify_cols}
@@ -129,8 +137,9 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
             pickle.dump(clustering_results_dict, f)
 
     # write to adata
-    adata.obsm[cluster_key] = cluster_weights
+    adata.obsm[cluster_key] = resps
     adata.uns[uns_key]['obsm_cluster_assignment_key'] = 'cell2cluster'
+    adata.uns[uns_key]['inflated_cluster_responsibilities'] = resps_inflated
     adata.uns[uns_key][stratify_key] = stratify_cols
     
     out = ()
