@@ -24,6 +24,9 @@ def get_cell_cohorts(adata, num_cohorts, stratify_cols='none', num_hvg=None,
                      copy=False, return_results=False, n_init=1, 
                      uns_key=None):
     
+    print("variance_inflation_factor:", variance_inflation_factor)
+
+
     return _get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, 
                              threshold_function,
                              variance_inflation_factor,

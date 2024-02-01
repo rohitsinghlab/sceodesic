@@ -22,6 +22,7 @@ from ..utils import order_by_second_moment
 def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03, 
              max_condition_number=50, stratify_cols='none', 
              num_hvg_per_cohort=100, pvd_pct=0.9, do_global_hvg=False, 
+             variance_inflation_factor=10.0,
              cohort_weights=None, top_genes=None,
              copy=False, n_init=1, key_added=None, uns_key=None):
     """
@@ -154,7 +155,7 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     elif cohort_weights is None and top_genes is not None:
         num_hvg = len(top_genes)
         adata.uns[uns_key][hvg_key] = top_genes
-        cluster_wts = get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key, return_results=True)['inflated_cluster_resps']
+        cluster_wts = get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key, variance_inflation_factor=variance_inflation_factor, return_results=True)['inflated_cluster_resps']
         estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, uns_key=uns_key)
     elif cohort_weights is not None and top_genes is not None:
         num_cohorts = cohort_weights.shape[1]
@@ -172,7 +173,7 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
                        " or input your own list of genes of interest.")
             print(message, file=sys.stderr)
             raise e
-        cluster_wts = get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key, return_results=True)['inflated_cluster_resps']
+        cluster_wts = get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, variance_inflation_factor=variance_inflation_factor, uns_key=uns_key, return_results=True)['inflated_cluster_resps']
         get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg, uns_key=uns_key)
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
     
