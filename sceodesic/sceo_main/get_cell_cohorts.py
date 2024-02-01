@@ -127,6 +127,7 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     # cnt_sizeLT50 = len([v for v in kmeans_cluster_dict.values() if len(v) < 50])
     # print(f'Finished clustering with {len(kmeans_cluster_dict)} clusters (originally intended {num_clusters}). Size < 10: {cnt_sizeLT10}, Size < 50: {cnt_sizeLT50}')    
     clustering_results_dict = {"cell2cluster" : resps, 
+                               "inflated_cluster_resps": resps_inflated,
                                "cluster_pca_matrices": pca_results,
                                "kmeans_models": kmeans_models,
                                "stratify_cols": stratify_cols}
@@ -139,7 +140,6 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     # write to adata
     adata.obsm[cluster_key] = resps
     adata.uns[uns_key]['obsm_cluster_assignment_key'] = 'cell2cluster'
-    adata.uns[uns_key]['inflated_cluster_responsibilities'] = resps_inflated
     adata.uns[uns_key][stratify_key] = stratify_cols
     
     out = ()

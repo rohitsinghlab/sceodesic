@@ -137,21 +137,31 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
         
     adata.uns[uns_key] = {}
      
+    # these are hard-coded for now (fix later)
+    cluster_key = CLUSTER_KEY
+    embeddings_dict_key = EMBEDDINGS_DICT_KEY
+    modules_key = MODULES_KEY
+    hvg_key = HVG_KEY
+    
     # can give cohort_weights or top_genes optionally
     if cohort_weights is not None and top_genes is None:
         num_cohorts = cohort_weights.shape[1]
         stratify_cols = '***NOT SPECIFIED***'
+        cluster_wts = cohort_weights
         get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg,
                                    cohort_weights=cohort_weights, uns_key=uns_key) 
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
     elif cohort_weights is None and top_genes is not None:
         num_hvg = len(top_genes)
-        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
+        adata.uns[uns_key][hvg_key] = top_genes
+        cluster_wts = get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key, return_results=True)['inflated_cluster_resps']
         estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, uns_key=uns_key)
     elif cohort_weights is not None and top_genes is not None:
         num_cohorts = cohort_weights.shape[1]
         stratify_cols = '***NOT SPECIFIED***'
         num_hvg = len(top_genes)
+        adata.uns[uns_key][hvg_key] = top_genes
+        cluster_wts = cohort_weights
         estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, 
                              cohort_weights=cohort_weights, uns_key=uns_key)
     else:
@@ -162,20 +172,12 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
                        " or input your own list of genes of interest.")
             print(message, file=sys.stderr)
             raise e
-        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
+        cluster_wts = get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key, return_results=True)['inflated_cluster_resps']
         get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg, uns_key=uns_key)
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
     
     # will do the same thing here no matter which of cohort_weights/top_genes is pre-specified
     reconstruct_programs(adata, sparse_pca_lambda, uns_key=uns_key)
-    
-    # these are hard-coded for now (fix later)
-    cluster_key = CLUSTER_KEY
-    embeddings_dict_key = EMBEDDINGS_DICT_KEY
-    modules_key = MODULES_KEY
-    hvg_key = HVG_KEY
-    
-    cluster_wts = adata.uns[uns_key]['inflated_cluster_responsibilities']
         
     embeddings = adata.uns[uns_key][embeddings_dict_key]
     modules = adata.uns[uns_key][modules_key]
