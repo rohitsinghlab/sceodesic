@@ -100,9 +100,9 @@ def _estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
         processed_data = filtered_data.X
 
     for i in range(results_clustering.shape[1]):
-        cluster_indices = np.where(results_clustering[:, i] > 0.0)[0]
+        cluster_indices = np.where(results_clustering[:, i].A > 0.0)[0]
         clusters[i] = processed_data[cluster_indices, :]
-        clusters_wts[i] = results_clustering[cluster_indices, i]
+        clusters_wts[i] = results_clustering[cluster_indices, i].A.squeeze()
     
     cluster_covariances = {}
     cluster_var_count = {}  

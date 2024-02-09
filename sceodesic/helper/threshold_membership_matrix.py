@@ -2,7 +2,7 @@
 import numpy as np 
 
 
-def determine_membership_matrix_threshold(A, quantiles, index):
+def determine_membership_matrix_threshold(A, quantiles=[0.99, 0.98, 0.97, 0.96, 0.95], index=10):
     """
     Determines a "reasonable" threshold for the membership matrix. 
     
@@ -27,9 +27,10 @@ def determine_membership_matrix_threshold(A, quantiles, index):
     return t
     
     
-def threshold_membership_matrix(A, quantiles=[0.99, 0.98, 0.97, 0.96, 0.95], index=10):
-    # ensure valid index number (not larger than number of cohorts)
-    index = min(A.shape[1], index)
-    t = determine_membership_matrix_threshold(A, quantiles, index)
+def threshold_membership_matrix(A, quantiles=[0.99, 0.98, 0.97, 0.96, 0.95], index=10, t=None):
+    if t is None:
+        # ensure valid index number (not larger than number of cohorts)
+        index = min(A.shape[1], index)
+        t = determine_membership_matrix_threshold(A, quantiles, index)
     A[A < t] = 0
     return A / A.sum(axis=1)[:, np.newaxis]
