@@ -33,4 +33,7 @@ def threshold_membership_matrix(A, quantiles=[0.99, 0.98, 0.97, 0.96, 0.95], ind
         index = min(A.shape[1], index)
         t = determine_membership_matrix_threshold(A, quantiles, index)
     A[A < t] = 0
-    return A / A.sum(axis=1)[:, np.newaxis]
+    sums = A.sum(axis=1)
+    if len(sums.shape) == 1:
+        sums = sums[:, np.newaxis]
+    return A / sums
