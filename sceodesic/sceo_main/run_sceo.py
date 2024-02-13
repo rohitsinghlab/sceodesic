@@ -23,7 +23,8 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
              max_condition_number=50, stratify_cols='none', 
              num_hvg_per_cohort=100, pvd_pct=0.9, do_global_hvg=False, 
              cohort_assn=None, top_genes=None,
-             copy=False, n_init=1, key_added=None, uns_key=None):
+             copy=False, n_init=1, key_added=None, uns_key=None, soft=False, 
+             soft_kernel_func=None):
     """
     Computes sceodesic embeddings and saves them in adata.obsm[key_added], 
     sceodesic programs are stored in adata.obsm[key_added],
@@ -146,7 +147,8 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
     elif cohort_assn is None and top_genes is not None:
         num_hvg = len(top_genes)
-        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
+        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key, 
+                         soft=soft, soft_kernel_func=soft_kernel_func)
         estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, uns_key=uns_key)
     elif cohort_assn is not None and top_genes is not None:
         num_cohorts = len(np.unique(cohort_assn))
@@ -162,7 +164,8 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
                        " or input your own list of genes of interest.")
             print(message, file=sys.stderr)
             raise e
-        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
+        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key, 
+                         soft=soft, soft_kernel_func=soft_kernel_func)
         get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg, uns_key=uns_key)
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
     
@@ -183,11 +186,16 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     
     # making the .obsm object 
     observation_count = adata.n_obs    
-    data_embedding = np.zeros((observation_count, num_hvg))
-    for i, embed in embeddings.items():
-        cluster_indices = cell2cluster[i]
-        for cell in cluster_indices:
-            data_embedding[cell, :] = embed
+    if soft:
+        resps = adata.uns[uns_key]['sceo_resps']
+        emat = np.array([embeddings[str(i)] for i in range(len(embeddings))])
+        data_embedding = resps @ emat
+    else:
+        data_embedding = np.zeros((observation_count, num_hvg))
+        for i, embed in embeddings.items():
+            cluster_indices = cell2cluster[i]
+            for cell in cluster_indices:
+                data_embedding[cell, :] = embed
             
     data_embedding, modules = order_by_second_moment(data_embedding, modules)
     
