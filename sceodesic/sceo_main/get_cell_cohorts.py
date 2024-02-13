@@ -162,6 +162,11 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         temp = functools.reduce(lambda x, y: scipy.sparse.hstack((x, y)), temp)
         adata.uns[uns_key]['temp'] = temp
 
+        # save cluster centers
+        adata.uns[uns_key]['kmeans_cluster_centers'] = {k: (v[0].cluster_centers_, v[1]) \
+                                                        for k, v in kmeans_models.items()}
+
+
     # write to adata.uns 
     adata.uns[uns_key][cluster_key] = kmeans_cluster_dict
     adata.uns[uns_key][stratify_key] = stratify_cols
