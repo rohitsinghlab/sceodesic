@@ -12,6 +12,7 @@ import scipy.sparse
 
 # package-specific imports 
 from ..utils import fn_timer
+from ..utils import split_computation_on_data_into_chunks
 from .default_keys import *
 
 @fn_timer
@@ -114,7 +115,7 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
 
             # compute conditional probs (as per kernel)
             centers = kmeans.cluster_centers_
-            group_resps = soft_kernel_func(X_dimred, centers)
+            group_resps = split_computation_on_data_into_chunks(X_dimred, soft_kernel_func, centers)
 
             # multiply by cluster weights 
             group_resps *= cluster_probs
@@ -127,8 +128,6 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
             t = np.median(np.sort(group_resps, axis=1)[-min(10, group_resps.shape[1])])
             group_resps = np.where(group_resps > t, group_resps, 0)
             group_resps /= group_resps.sum(axis=1)[:, np.newaxis]
-
-
 
             resps.append(csr_matrix(group_resps))
         
@@ -186,3 +185,4 @@ def _get_auto_num_clusters(adata, *args, **kwargs):
     num_cohorts = int(adata.X.shape[0]*1.0/num_hvg)
     print("number of cohorts:", num_cohorts)
     return num_cohorts
+
