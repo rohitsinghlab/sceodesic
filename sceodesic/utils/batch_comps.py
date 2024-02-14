@@ -2,7 +2,7 @@ import numpy as np
 from functools import reduce
 
 
-def split_computation_on_data_into_chunks(data, func, *args, nblock=10000, **kwargs):
+def split_computation_on_data_into_chunks(data, func, *args, nblock=100000, **kwargs):
     nobs = data.shape[0]
     lo = 0
     niter = (nobs // nblock) + (0 if nobs % nblock == 0 else 1)
