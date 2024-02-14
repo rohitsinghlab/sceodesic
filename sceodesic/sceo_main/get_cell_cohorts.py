@@ -22,7 +22,7 @@ def get_cell_cohorts(adata, num_cohorts, stratify_cols='none', num_hvg=None,
 
     if soft and soft_kernel_func is None:
         gamma = 0.25
-        soft_kernel_func = lambda x: np.exp(-gamma * np.power(x, 2).sum(axis=1))
+        soft_kernel_func = lambda data, means: np.exp(-gamma * np.power(data[:, np.newaxis, :] - means[np.newaxis, :], 2).sum(axis=2))
     
     return _get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, 
                              soft, soft_kernel_func,
@@ -114,7 +114,7 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
 
             # compute conditional probs (as per kernel)
             centers = kmeans.cluster_centers_
-            group_resps = np.apply_along_axis(lambda x: soft_kernel_func(centers-x), 1, X_dimred)
+            group_resps = soft_kernel_func(X_dimred, centers)
 
             # multiply by cluster weights 
             group_resps *= cluster_probs
