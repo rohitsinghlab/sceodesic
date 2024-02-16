@@ -39,6 +39,9 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     
     if uns_key is None:
         uns_key = UNS_KEY
+
+    if uns_key not in adata.uns:
+        adata.uns[uns_key] = {}
         
     if cluster_key is None:
         cluster_key = CLUSTER_KEY

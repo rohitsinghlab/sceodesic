@@ -123,6 +123,7 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     :returns: a copy of adata if copy=True, else modifies adata in place and returns None. 
     """
     
+    print("goooogogogogogogogg")
     if key_added is None:
         obsm_key_added = SCEO_EMBEDDINGS_KEY
         varm_key_added = MODULES_KEY
@@ -192,10 +193,10 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
         data_embedding = resps @ emat
     else:
         data_embedding = np.zeros((observation_count, num_hvg))
-        for i, embed in embeddings.items():
-            cluster_indices = cell2cluster[i]
-            for cell in cluster_indices:
-                data_embedding[cell, :] = embed
+        for label, embed in embeddings.items():
+            clusteridx = cell2cluster[label]
+            cluster_sz = len(clusteridx)
+            data_embedding[clusteridx] = np.tile(embed, cluster_sz).reshape((cluster_sz, num_hvg))
             
     data_embedding, modules = order_by_second_moment(data_embedding, modules)
     

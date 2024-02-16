@@ -71,6 +71,9 @@ def _estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
     
     if uns_key is None:
         uns_key = UNS_KEY
+
+    if uns_key not in adata.uns:
+        adata.uns[uns_key] = {}
         
     if cluster_covar_key is None:
         cluster_covar_key = CLUSTER_COVAR_KEY
@@ -87,27 +90,22 @@ def _estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
     
     cell2cluster = results_clustering["cell2cluster"]
     
-    filtered_data = adata[:,top_genes]
+    filtered_data = adata[:, top_genes]
     
-    # Get the clusters from the reduced data.
-    clusters = {}
-
     processed_data = None
     if scipy.sparse.issparse(filtered_data.X):
         processed_data = filtered_data.X.A
     else:
         processed_data = filtered_data.X
 
-    for key in cell2cluster.keys():
-        cluster_indices = cell2cluster[key]
-        clusters[key] = processed_data[cluster_indices,:]
-    
     cluster_covariances = {}
     cluster_var_count = {}  
-    for i,cluster in clusters.items():
-        cluster_covar, var_count = compute_covariance_and_ncomps_pct_variance(cluster, max_condition_number, pvd_pct)
-        cluster_covariances[i] = cluster_covar # Ensures a PSD matrix.
-        cluster_var_count[i] = var_count
+    for label, clusterid in cell2cluster.items():
+        cluster_covar, var_count = compute_covariance_and_ncomps_pct_variance(processed_data[clusterid], 
+                                                                              max_condition_number, 
+                                                                              pvd_pct)
+        cluster_covariances[label] = cluster_covar # Ensures a PSD matrix.
+        cluster_var_count[label] = var_count
 
     ### invariant based programming: put in asserts on what you expect the shape to be
 
