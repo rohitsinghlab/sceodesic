@@ -17,13 +17,13 @@ from .default_keys import *
 
 @fn_timer
 def get_cell_cohorts(adata, num_cohorts, stratify_cols='none', num_hvg=None, 
-                     soft=False, soft_kernel_func=None,
+                     soft=False, soft_kernel_func=None, 
+                     soft_kernel_rbf_gamma=0.01,
                      copy=False, return_results=False, n_init=1, 
                      uns_key=None):
 
     if soft and soft_kernel_func is None:
-        gamma = 0.25
-        soft_kernel_func = lambda data, means: np.exp(-gamma * np.power(data[:, np.newaxis, :] - means[np.newaxis, :], 2).sum(axis=2))
+        soft_kernel_func = lambda data, means: np.exp(-soft_kernel_rbf_gamma * np.power(data[:, np.newaxis, :] - means[np.newaxis, :], 2).sum(axis=2))
     
     return _get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, 
                              soft, soft_kernel_func,
