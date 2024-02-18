@@ -122,8 +122,7 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     
     :returns: a copy of adata if copy=True, else modifies adata in place and returns None. 
     """
-    
-    print("goooogogogogogogogg")
+
     if key_added is None:
         obsm_key_added = SCEO_EMBEDDINGS_KEY
         varm_key_added = MODULES_KEY

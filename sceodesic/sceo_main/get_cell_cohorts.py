@@ -7,9 +7,6 @@ import numpy as np
 import fbpca 
 from sklearn.cluster import KMeans
 
-from scipy.sparse import csr_matrix
-import scipy.sparse
-
 # package-specific imports 
 from ..utils import fn_timer
 from ..utils import split_computation_on_data_into_chunks
@@ -37,6 +34,8 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
                       clustering_filename=None,
                       uns_key=None, cluster_key=None, stratify_key=None):
     
+    print('hello, I\'m new!')
+
     if uns_key is None:
         uns_key = UNS_KEY
 
@@ -87,7 +86,6 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     # store responsibilities if soft
     if soft:
         resps = []
-        temp = []
 
     kmeans_cluster_dict = {}
     curr_cluster_count = 0
@@ -116,23 +114,44 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
             cluster_probs = np.array(cluster_probs, dtype='float64')
             cluster_probs /= cluster_probs.sum()
 
+            # group responsibility matrix 
+            group_resps = np.zeros((X_dimred.shape[0], group_num_clusters))
+
+            # get threshold on subset of dataset if we have very many cells
+            t = None
+            mask = np.repeat(True, X_dimred.shape[0])
+            nsubsample = 10000
+            if X_dimred.shape[0] > nsubsample:
+                centers = kmeans.cluster_centers_
+                subsample = np.random.choice(X_dimred.shape[0], replace=False, size=nsubsample)
+                mask[subsample] = False
+                temp_resps = split_computation_on_data_into_chunks(X_dimred[~mask], soft_kernel_func, centers).A
+                temp_resps *= cluster_probs
+                temp_resps /= temp_resps.sum(axis=1)[:, np.newaxis]
+                t = np.median(np.sort(temp_resps, axis=1)[-min(10, nsubsample)])
+
+                group_resps[~mask] = temp_resps
+
+            # we need to be sparse 
+            def temp_func(t, *args, **kwargs):
+                matrix = soft_kernel_func(*args, **kwargs)
+                matrix *= cluster_probs
+                matrix /= matrix.sum(axis=1)[:, np.newaxis]
+                if t is None:
+                    t = np.median(np.sort(matrix, axis=1)[-min(10, matrix.shape[1])])
+                matrix = np.where(matrix > t, matrix, 0)
+                return matrix / matrix.sum(axis=1)
+
+            func = functools.partial(temp_func, t)
+                
             # compute conditional probs (as per kernel)
             centers = kmeans.cluster_centers_
-            group_resps = split_computation_on_data_into_chunks(X_dimred, soft_kernel_func, centers)
 
-            # multiply by cluster weights 
-            group_resps *= cluster_probs
+            print("before")
+            group_resps[mask] = split_computation_on_data_into_chunks(X_dimred[mask], func, centers)
+            print("after")
 
-            group_resps /= group_resps.sum(axis=1)[:, np.newaxis]
-
-            temp.append(group_resps)
-
-            # get threshold and zero out small probabilities 
-            t = np.median(np.sort(group_resps, axis=1)[-min(10, group_resps.shape[1])])
-            group_resps = np.where(group_resps > t, group_resps, 0)
-            group_resps /= group_resps.sum(axis=1)[:, np.newaxis]
-
-            resps.append(csr_matrix(group_resps))
+            resps.append(group_resps)
         
         # save the kmeans model
         kmeans_models[strat_desc] = (kmeans, curr_cluster_count)
@@ -159,10 +178,8 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
 
     # save pca to obsm if soft - will need later 
     if soft:
-        resps = functools.reduce(lambda x, y: scipy.sparse.hstack((x, y)), resps)
+        resps = functools.reduce(lambda x, y: np.hstack((x, y)), resps)
         adata.uns[uns_key]['sceo_resps'] = resps
-        temp = functools.reduce(lambda x, y: scipy.sparse.hstack((x, y)), temp)
-        adata.uns[uns_key]['temp'] = temp
 
         # save cluster centers
         adata.uns[uns_key]['kmeans_cluster_centers'] = {k: (v[0].cluster_centers_, v[1]) \
