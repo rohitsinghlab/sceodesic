@@ -9,27 +9,19 @@ from sklearn.cluster import KMeans
 
 # package-specific imports 
 from ..utils import fn_timer
-from ..utils import split_computation_on_data_into_chunks
 from .default_keys import *
 
 @fn_timer
 def get_cell_cohorts(adata, num_cohorts, stratify_cols='none', num_hvg=None, 
-                     soft=False, soft_kernel_func=None, 
-                     soft_kernel_rbf_gamma=0.01,
                      copy=False, return_results=False, n_init=1, 
                      uns_key=None):
-
-    if soft and soft_kernel_func is None:
-        soft_kernel_func = lambda data, means: np.exp(-soft_kernel_rbf_gamma * np.power(data[:, np.newaxis, :] - means[np.newaxis, :], 2).sum(axis=2))
     
     return _get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, 
-                             soft, soft_kernel_func,
                              copy, return_results, n_init, 
                              uns_key=uns_key)
 
 
 def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg, 
-                      soft, soft_kernel_func,
                       copy, return_results, n_init, 
                       clustering_filename=None,
                       uns_key=None, cluster_key=None, stratify_key=None):
@@ -61,6 +53,9 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
             print(f"num_hvg is set to {num_hvg} and of type {type(num_hvg)}.", file=sys.stderr)
             raise e
 
+    # whether or not we should extra clustering information 
+    save_extra_info = (return_results or (clustering_filename is not None))
+    
     # cluster - either stratify or don't
     stratify_cols = [stratify_cols] if isinstance(stratify_cols, str) else stratify_cols 
     if len(stratify_cols) > 0 and stratify_cols[0].lower() != 'none':
@@ -72,19 +67,14 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         
         groups = [(adata[stratify_vec == strat,:], np.where(stratify_vec==strat)[0], strat) \
                   for strat in unique_strats]
+        
     else:
         groups = [(adata, np.arange(adata.shape[0]), 'all')]
 
-    # storing PCA results as well
-    pca_results = {}
-    
-    # storing kmeans objects as well
-    kmeans_models = {}
-    
-    # store responsibilities if soft
-    if soft:
-        resps = []
-
+    if save_extra_info:
+        pca_results = {}
+        kmeans_models = {}
+        
     kmeans_cluster_dict = {}
     curr_cluster_count = 0
     for idx, (group_adata, orig_indices, strat_desc) in enumerate(groups):    
@@ -93,10 +83,6 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
 
         X_dimred = U[:,:100]* s[:100]
         print(f"PCA done for stratification group {idx+1} '{strat_desc}'")
-
-        # save the pca results
-        pca_means = np.array(group_adata.X.mean(axis=0)).squeeze()
-        pca_results[strat_desc] = {'U': U, 's': s, 'Vt': Vt, 'means': pca_means}
         
         group_num_clusters = max(1, int(float(group_adata.shape[0])/adata.shape[0] * num_clusters))
         
@@ -104,85 +90,37 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         kmeans.fit(X_dimred)
         print(f"Fitting done k means with {group_num_clusters} clusters for stratification group {idx+1} '{strat_desc}'")
         kmeans_cluster_assignments = kmeans.labels_
-
-        # compute cluster responsibilities
-        if soft:
-            # compute cluster probabilities
-            cluster_probs = [(kmeans_cluster_assignments == i).sum() for i in range(group_num_clusters)]
-            cluster_probs = np.array(cluster_probs, dtype='float64')
-            cluster_probs /= cluster_probs.sum()
-
-            # group responsibility matrix 
-            group_resps = np.zeros((X_dimred.shape[0], group_num_clusters))
-
-            # get threshold on subset of dataset if we have very many cells
-            t = None
-            mask = np.repeat(True, X_dimred.shape[0])
-            nsubsample = 10000
-            if X_dimred.shape[0] > nsubsample:
-                centers = kmeans.cluster_centers_
-                subsample = np.random.choice(X_dimred.shape[0], replace=False, size=nsubsample)
-                mask[subsample] = False
-                temp_resps = split_computation_on_data_into_chunks(X_dimred[~mask], soft_kernel_func, centers).A
-                temp_resps *= cluster_probs
-                temp_resps /= temp_resps.sum(axis=1)[:, np.newaxis]
-                t = np.median(np.sort(temp_resps, axis=1)[-min(10, nsubsample)])
-
-                group_resps[~mask] = temp_resps
-
-            # we need to be sparse 
-            def temp_func(t, *args, **kwargs):
-                matrix = soft_kernel_func(*args, **kwargs)
-                matrix *= cluster_probs
-                matrix /= matrix.sum(axis=1)[:, np.newaxis]
-                if t is None:
-                    t = np.median(np.sort(matrix, axis=1)[-min(10, matrix.shape[1])])
-                matrix = np.where(matrix > t, matrix, 0)
-                return matrix / matrix.sum(axis=1)
-
-            func = functools.partial(temp_func, t)
-                
-            # compute conditional probs (as per kernel)
-            centers = kmeans.cluster_centers_
-
-            print("before")
-            group_resps[mask] = split_computation_on_data_into_chunks(X_dimred[mask], func, centers)
-            print("after")
-
-            resps.append(group_resps)
         
-        # save the kmeans model
-        kmeans_models[strat_desc] = (kmeans, curr_cluster_count)
+        if save_extra_info:
+            # save the pca results
+            pca_means = np.array(group_adata.X.mean(axis=0)).squeeze()
+            pca_results[strat_desc] = {'Vt': Vt, 'means': pca_means}
+            
+            # save the kmeans model
+            kmeans_models[strat_desc] = (kmeans, curr_cluster_count)
 
         for i in range(group_num_clusters):
             # save keys as strings so we can save to .h5ad
-            kmeans_cluster_dict[str(curr_cluster_count)] = orig_indices[np.where(kmeans_cluster_assignments == i)[0]].tolist()
+            kmeans_cluster_dict[curr_cluster_count] = orig_indices[np.where(kmeans_cluster_assignments == i)[0]].tolist()
             curr_cluster_count += 1
 
     cnt_sizeLT10 = len([v for v in kmeans_cluster_dict.values() if len(v) < 10])
     cnt_sizeLT50 = len([v for v in kmeans_cluster_dict.values() if len(v) < 50])
     print(f'Finished clustering with {len(kmeans_cluster_dict)} clusters (originally intended {num_clusters}). Size < 10: {cnt_sizeLT10}, Size < 50: {cnt_sizeLT50}')    
-    clustering_results_dict = {"cell2cluster" : kmeans_cluster_dict, 
-                               "cluster_pca_matrices": pca_results,
-                               "kmeans_models": kmeans_models,
-                               "kmeans_centers": {k: (v[0].cluster_centers_, v[1]) \
-                                                  for k, v in kmeans_models.items()},
-                               "stratify_cols": stratify_cols}
     
+    # dictionary to hold extra information
+    if save_extra_info:
+        clustering_results_dict = {"cell2cluster" : kmeans_cluster_dict, 
+                                   "cluster_pca_matrices": pca_results,
+                                   "groups": {desc: indices for (_, indices, desc) in groups},
+                                   "kmeans_models": kmeans_models,
+                                   "kmeans_centers": {k: (v[0].cluster_centers_, v[1]) \
+                                                      for k, v in kmeans_models.items()},
+                                   "stratify_cols": stratify_cols}
     
     if clustering_filename:
         with open(clustering_filename, 'wb') as f:
             pickle.dump(clustering_results_dict, f)
-
-    # save pca to obsm if soft - will need later 
-    if soft:
-        resps = functools.reduce(lambda x, y: np.hstack((x, y)), resps)
-        adata.uns[uns_key]['sceo_resps'] = resps
-
-        # save cluster centers
-        adata.uns[uns_key]['kmeans_cluster_centers'] = {k: (v[0].cluster_centers_, v[1]) \
-                                                        for k, v in kmeans_models.items()}
-
 
     # write to adata.uns 
     adata.uns[uns_key][cluster_key] = kmeans_cluster_dict
