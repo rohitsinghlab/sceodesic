@@ -7,9 +7,15 @@ import numpy as np
 import fbpca 
 from sklearn.cluster import KMeans
 
+# approx NN for soft embeddings 
+from annoy import AnnoyIndex
+
 # package-specific imports 
 from ..utils import fn_timer
 from .default_keys import *
+
+CLUSTER_NUM_NEIGHBORS = 5
+
 
 @fn_timer
 def get_cell_cohorts(adata, num_cohorts, stratify_cols='none', num_hvg=None, 
@@ -72,8 +78,8 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         groups = [(adata, np.arange(adata.shape[0]), 'all')]
 
     if save_extra_info:
-        pca_results = {}
-        kmeans_models = {}
+        pca_results = np.zeros((adata.shape[0], 100))
+        kmeans_centers = np.zeros((num_clusters, 100))
         
     kmeans_cluster_dict = {}
     curr_cluster_count = 0
@@ -93,16 +99,21 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         
         if save_extra_info:
             # save the pca results
-            pca_means = np.array(group_adata.X.mean(axis=0)).squeeze()
-            pca_results[strat_desc] = {'Vt': Vt, 'means': pca_means}
-            
-            # save the kmeans model
-            kmeans_models[strat_desc] = (kmeans, curr_cluster_count)
+            pca_results[orig_indices] = X_dimred 
+
+            # save the kmeans centers
+            kmeans_centers[curr_cluster_count:curr_cluster_count+group_num_clusters] = kmeans.cluster_centers_
 
         for i in range(group_num_clusters):
             # save keys as strings so we can save to .h5ad
             kmeans_cluster_dict[curr_cluster_count] = orig_indices[np.where(kmeans_cluster_assignments == i)[0]].tolist()
             curr_cluster_count += 1
+
+    # make the knn search index
+    knn_graph = AnnoyIndex(100, 'euclidean')
+    for i, v in enumerate(kmeans_centers):
+        knn_graph.add_item(i, v)
+    knn_graph.build(10)
 
     cnt_sizeLT10 = len([v for v in kmeans_cluster_dict.values() if len(v) < 10])
     cnt_sizeLT50 = len([v for v in kmeans_cluster_dict.values() if len(v) < 50])
@@ -111,11 +122,10 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     # dictionary to hold extra information
     if save_extra_info:
         clustering_results_dict = {"cell2cluster" : kmeans_cluster_dict, 
-                                   "cluster_pca_matrices": pca_results,
+                                   "centroid_knn_graph": knn_graph,
+                                   "pca_results": pca_results,
                                    "groups": {desc: indices for (_, indices, desc) in groups},
-                                   "kmeans_models": kmeans_models,
-                                   "kmeans_centers": {k: (v[0].cluster_centers_, v[1]) \
-                                                      for k, v in kmeans_models.items()},
+                                   "kmeans_centers": kmeans_centers,
                                    "stratify_cols": stratify_cols}
     
     if clustering_filename:

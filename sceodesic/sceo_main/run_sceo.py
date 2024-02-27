@@ -194,8 +194,7 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     # making the .obsm object 
     observation_count = adata.n_obs    
     if soft:
-        data_embedding = compute_soft_embeddings(adata.X, 
-                                                 num_hvg,
+        data_embedding = compute_soft_embeddings(num_hvg,
                                                  clustering_results_dict,
                                                  soft_kernel_func, 
                                                  embeddings, 
