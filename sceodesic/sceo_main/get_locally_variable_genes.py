@@ -72,6 +72,9 @@ def _get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster, global_hvg,
         # Now compute bottoms up hvgs.
         hvg_count_vec = np.zeros(adata.shape[1])
         for clusterids in cell2cluster.values():
+            print("note: you are using a hack to prevent a crash here. (line 75: get_locally_variable_genes.py). Please write code to reassign small clusters.")
+            if len(clusterids) < 2:
+                continue
             hvgs = sc.pp.highly_variable_genes(adata[clusterids], 
                                                layer=None, 
                                                n_top_genes=num_hvg_per_cluster,

@@ -41,18 +41,20 @@ def compute_soft_embeddings(expr_data, num_hvg,
         pca_means = cluster_info['cluster_pca_matrices'][group_desc]['means']
         pca_v = cluster_info['cluster_pca_matrices'][group_desc]['Vt']
         
-        # compute a threshold 
-        nobs = len(group_indices)
-        sample_size = min(10000, nobs)
-        group_sample = np.random.choice(group_indices, replace=False, size=sample_size)
-        A = compute_resps(expr_data[group_sample], 
-                          pca_means,
-                          pca_v, 
-                          means, 
-                          weights, 
-                          kernel_func, 
-                          *args, **kwargs)
-        threshold = determine_membership_matrix_threshold(A)
+#         # compute a threshold 
+#         nobs = len(group_indices)
+#         sample_size = min(10000, nobs)
+#         group_sample = np.random.choice(group_indices, replace=False, size=sample_size)
+#         A = compute_resps(expr_data[group_sample], 
+#                           pca_means,
+#                           pca_v, 
+#                           means, 
+#                           weights, 
+#                           kernel_func, 
+#                           *args, **kwargs)
+#         threshold = determine_membership_matrix_threshold(A)
+        # using threshold 0 for now 
+        threshold = 0
         
         # compute and assign embeddings
         results[group_indices] = functools.reduce(lambda x, y: np.vstack((x, y)),
