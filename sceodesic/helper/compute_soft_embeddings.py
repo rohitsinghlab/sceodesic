@@ -8,7 +8,7 @@ import functools
 # for chunking computations
 from ..utils import split_computation_on_data_into_chunks
 
-N_NEIGHBORS = 5
+N_NEIGHBORS = 10
 
 
 def compute_soft_embeddings(num_hvg, cluster_info, kernel_func,
@@ -32,14 +32,11 @@ def compute_soft_embeddings(num_hvg, cluster_info, kernel_func,
         ncluster = len(cluster_indices)
         xcluster = pca_data[cluster_indices]
         
-        # get nearest neighbors
-        nn_mat = np.array([knn_graph.get_nns_by_vector(x, N_NEIGHBORS) \
-                           for x in xcluster])
         
         # get the soft embeddings for this cluster 
         results[cluster_indices] = _compute_soft_embeddings(xcluster, 
                                                             centers, 
-                                                            nn_mat, 
+                                                            knn_graph, 
                                                             embeddings_matrix, 
                                                             kernel_func, 
                                                             *args, 
@@ -49,14 +46,17 @@ def compute_soft_embeddings(num_hvg, cluster_info, kernel_func,
         
     
 @split_computation_on_data_into_chunks
-def _compute_soft_embeddings(X, centers, nn_matrix, 
+def _compute_soft_embeddings(X, centers, knn_graph, 
                              embeddings_matrix, 
                              kernel_func,
                              *args, **kwargs): 
-    N, K = nn_matrix.shape
+    N = len(X)
     nclusters = embeddings_matrix.shape[0]
+    # get nearest neighbors
+    nn_matrix = np.array([knn_graph.get_nns_by_vector(x, N_NEIGHBORS) \
+                          for x in X])
     resps = compute_resps(X, centers, nn_matrix, kernel_func)
-    xidx = np.repeat(np.arange(N), K)
+    xidx = np.repeat(np.arange(N), N_NEIGHBORS)
     resps = coo_matrix((resps.flatten(), (xidx, nn_matrix.flatten())), 
                        shape=(N, nclusters)).tocsr()
     return resps @ embeddings_matrix

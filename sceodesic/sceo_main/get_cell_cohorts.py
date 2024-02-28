@@ -110,10 +110,11 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
             curr_cluster_count += 1
 
     # make the knn search index
-    knn_graph = AnnoyIndex(100, 'euclidean')
-    for i, v in enumerate(kmeans_centers):
-        knn_graph.add_item(i, v)
-    knn_graph.build(10)
+    if save_extra_info:
+        knn_graph = AnnoyIndex(100, 'euclidean')
+        for i, v in enumerate(kmeans_centers):
+            knn_graph.add_item(i, v)
+        knn_graph.build(10)
 
     cnt_sizeLT10 = len([v for v in kmeans_cluster_dict.values() if len(v) < 10])
     cnt_sizeLT50 = len([v for v in kmeans_cluster_dict.values() if len(v) < 50])
