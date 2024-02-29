@@ -8,7 +8,7 @@ import functools
 # for chunking computations
 from ..utils import split_computation_on_data_into_chunks
 
-N_NEIGHBORS = 10
+N_NEIGHBORS = 5
 
 
 def compute_soft_embeddings(num_hvg, cluster_info, kernel_func,
