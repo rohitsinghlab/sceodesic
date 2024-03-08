@@ -1,7 +1,7 @@
 
 import numpy as np 
 from scipy import sparse 
-from scipy.sparse import csr_matrix, coo_matrix
+from scipy.sparse import csr_array, coo_array
 
 import functools
 
@@ -34,13 +34,15 @@ def compute_soft_embeddings(num_hvg, cluster_info, kernel_func,
         
         
         # get the soft embeddings for this cluster 
-        results[cluster_indices] = _compute_soft_embeddings(xcluster, 
-                                                            centers, 
-                                                            knn_graph, 
-                                                            embeddings_matrix, 
-                                                            kernel_func, 
-                                                            *args, 
-                                                            **kwargs)
+        soft_embeddings = _compute_soft_embeddings(xcluster, 
+                                                   centers, 
+                                                   knn_graph, 
+                                                   embeddings_matrix, 
+                                                   kernel_func, 
+                                                   *args, 
+                                                   **kwargs)
+        
+        results[cluster_indices] = functools.reduce(lambda x, y: np.vstack((x, y)), soft_embeddings)
         
     return results
         
@@ -52,14 +54,30 @@ def _compute_soft_embeddings(X, centers, knn_graph,
                              *args, **kwargs): 
     N = len(X)
     nclusters = embeddings_matrix.shape[0]
+    
+    assert centers.shape == (nclusters, X.shape[1])
+    
     # get nearest neighbors
     nn_matrix = np.array([knn_graph.get_nns_by_vector(x, N_NEIGHBORS) \
                           for x in X])
+    
+    assert nn_matrix.shape == (N, N_NEIGHBORS)
+    assert np.all(np.isfinite(nn_matrix))
+    
     resps = compute_resps(X, centers, nn_matrix, kernel_func)
+    
+    assert resps.shape == (N, N_NEIGHBORS)
+    assert np.all(np.isfinite(nn_matrix))
+    
     xidx = np.repeat(np.arange(N), N_NEIGHBORS)
-    resps = coo_matrix((resps.flatten(), (xidx, nn_matrix.flatten())), 
+    resps = coo_array((resps.flatten(), (xidx, nn_matrix.flatten())), 
                        shape=(N, nclusters)).tocsr()
-    return resps @ embeddings_matrix
+    
+    assert resps.shape == (N, nclusters)
+    assert np.all(np.isfinite(nn_matrix))
+    
+    out = resps @ embeddings_matrix
+    return out
 
 
 def compute_resps(X, centers, nn_matrix, kernel_func, 
