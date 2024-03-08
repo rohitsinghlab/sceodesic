@@ -79,7 +79,7 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
 
     if save_extra_info:
         pca_results = np.zeros((adata.shape[0], 100))
-        kmeans_centers = np.zeros((num_clusters, 100))
+        kmeans_centers = []
         
     kmeans_cluster_dict = {}
     curr_cluster_count = 0
@@ -102,12 +102,16 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
             pca_results[orig_indices] = X_dimred 
 
             # save the kmeans centers
-            kmeans_centers[curr_cluster_count:curr_cluster_count+group_num_clusters] = kmeans.cluster_centers_
+            kmeans_centers.append(kmeans.cluster_centers_)
 
         for i in range(group_num_clusters):
             # save keys as strings so we can save to .h5ad
             kmeans_cluster_dict[curr_cluster_count] = orig_indices[np.where(kmeans_cluster_assignments == i)[0]].tolist()
             curr_cluster_count += 1
+    
+    # reformat the kmeans cluster centers into a single matrix 
+    if save_extra_info:
+        kmeans_centers = functools.reduce(lambda x, y: np.vstack((x, y)), kmeans_centers)
 
     # make the knn search index
     if save_extra_info:
