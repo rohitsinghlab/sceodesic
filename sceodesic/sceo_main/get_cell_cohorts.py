@@ -84,10 +84,17 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
     kmeans_cluster_dict = {}
     curr_cluster_count = 0
     for idx, (group_adata, orig_indices, strat_desc) in enumerate(groups):    
-        # Cluster in PC space.    
-        U, s, Vt = fbpca.pca(group_adata.X, k=100)         
+        # Cluster in PC space.   
+        npcs = 100
+        
+        # skip stratification group if less than 100 observations 
+        if group_adata.shape[0] < npcs:
+            print("skipping stratification group", idx, "that only had", group_adata.shape[0], "observations!")
+            continue 
+            
+        U, s, Vt = fbpca.pca(group_adata.X, k=npcs)         
 
-        X_dimred = U[:,:100]* s[:100]
+        X_dimred = U[:,:npcs]* s[:npcs]
         print(f"PCA done for stratification group {idx+1} '{strat_desc}'")
         
         group_num_clusters = max(1, int(float(group_adata.shape[0])/adata.shape[0] * num_clusters))
