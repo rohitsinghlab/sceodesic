@@ -73,7 +73,21 @@ def _reconstruct_programs(adata, sparse_pca_lambda, embedding_filename=None,
         S,U = np.linalg.eigh(current_covariance)
         cluster_eigendecomposition[cluster_index] = [S,U]
 
-    all_eigenvectors_horizontal = np.vstack([cluster_eigendecomposition[cluster_index][1][:, :cluster_var_count[cluster_index]].T for cluster_index in cluster_eigendecomposition])
+    #### old code ####
+    #### bug: taking least varied components, not most varied ####
+    ### all_eigenvectors_horizontal = np.vstack([cluster_eigendecomposition[cluster_index][1][:, :cluster_var_count[cluster_index]].T for cluster_index in cluster_eigendecomposition])
+    #### old code ####
+
+    # new code: take most-varied components
+    all_eigenvectors_horizontal = np.vstack([cluster_eigendecomposition[cluster_index][1][:, -cluster_var_count[cluster_index]:].T for cluster_index in cluster_eigendecomposition])
+    #all_eigenvectors_horizontal = []
+    #for cluster_index in cluster_eigendecomposition:
+        #_, U = cluster_eigendecomposition[cluster_index]
+        #ncomps = cluster_var_count[cluster_index]
+        ## columns are eigenvectors, sorted in ascending order of eigenvalues
+        #all_eigenvectors_horizontal.append(U[:, -ncomps:].T)
+    ## transpose so that eigenvectors are horizontal
+    #all_eigenvectors_horizontal = np.vstack(all_eigenvectors_horizontal)
 
     print("Concatenated eigenvectors matrix: ", all_eigenvectors_horizontal.shape)
     print(np.allclose(all_eigenvectors_horizontal, all_eigenvectors_horizontal.real))
