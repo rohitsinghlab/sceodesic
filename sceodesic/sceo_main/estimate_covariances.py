@@ -100,8 +100,8 @@ def _estimate_covariances(adata, max_condition_number, pvd_pct=0.9,
 
     cluster_covariances = {}
     cluster_var_count = {}  
-    for label, clusterid in cell2cluster.items():
-        cluster_covar, var_count = compute_covariance_and_ncomps_pct_variance(processed_data[clusterid], 
+    for label, cluster_members in cell2cluster.items():
+        cluster_covar, var_count = compute_covariance_and_ncomps_pct_variance(processed_data[cluster_members], 
                                                                               max_condition_number, 
                                                                               pvd_pct)
         cluster_covariances[label] = cluster_covar # Ensures a PSD matrix.
