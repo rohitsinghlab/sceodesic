@@ -108,7 +108,9 @@ def _reconstruct_programs(adata, sparse_pca_lambda, embedding_filename=None,
     embeddings = {}
     for cluster_index in cluster_eigendecomposition:
         sigma_i = covariance_matrices[cluster_index]
-        M_star = sparse_pca_eigenvectors.T @ scipy.linalg.logm(sigma_i) @ sparse_pca_eigenvectors
+        # M_star = sparse_pca_eigenvectors.T @ scipy.linalg.logm(sigma_i) @ sparse_pca_eigenvectors
+        # The eigenvectors are the rows of sparse_pca_eigenvectors
+        M_star = sparse_pca_eigenvectors @ scipy.linalg.logm(sigma_i) @ sparse_pca_eigenvectors.T
         diagonal = np.diagonal(M_star)
         embedding = diagonal 
         embeddings[cluster_index] = embedding
