@@ -80,6 +80,7 @@ def _reconstruct_programs(adata, sparse_pca_lambda, embedding_filename=None,
 
     # new code: take most-varied components
     all_eigenvectors_horizontal = np.vstack([cluster_eigendecomposition[cluster_index][1][:, -cluster_var_count[cluster_index]:].T for cluster_index in cluster_eigendecomposition])
+    ## done another way:
     #all_eigenvectors_horizontal = []
     #for cluster_index in cluster_eigendecomposition:
         #_, U = cluster_eigendecomposition[cluster_index]
