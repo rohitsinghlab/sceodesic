@@ -27,7 +27,16 @@ import anndata
 adata = [single cell gene expression anndata object]
 ```
 
-Now, you are ready to discover some programs!
+Now, you are ready to discover some programs! Note that you should ensure the gene expression data is log-normalized counts:
+
+```python
+# if adata is raw counts:
+import scanpy as sc
+
+# normalize to log-cp10k counts
+sc.pp.normalize_total(adata, 1e4)
+sc.pp.log1p(adata)
+```
 
 ```python
 from sceodesic import run_sceo

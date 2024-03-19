@@ -210,7 +210,8 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     
     # make the .varm data matrix 
     not_top_genes = adata.var_names[~np.isin(adata.var_names, top_genes)]
-    tdf = pd.DataFrame(modules, index=top_genes)
+    ### transpose matrix since it is (n_components, nfeatures) ###
+    tdf = pd.DataFrame(modules.T, index=top_genes)
     ntdf = pd.DataFrame(np.zeros((adata.shape[1]-len(top_genes), num_hvg)), index=not_top_genes)
     edf = pd.DataFrame(index=adata.var_names)
     varm = edf.join(pd.concat([tdf, ntdf]))
