@@ -10,7 +10,10 @@ def compute_covariance_and_ncomps_pct_variance(data, max_condition_number, pvd_p
     matrix = np.cov(data, rowvar=False)
 
     S,U = np.linalg.eigh(matrix)
-    ncomps_pct_variance = np.argmax(np.cumsum(S[::-1]) / np.sum(S) >= pvd_pct) + 1
+
+    non_zero_count = np.sum(S != 0)
+    var_explained_count = np.argmax(np.cumsum(S[::-1]) / np.sum(S) > pvd_pct) + 1
+    ncomps_pct_variance = min(non_zero_count, var_explained_count)
     
     # normalize by condition-volume 
     matrix = _normalize_condition_volume(S, U, max_condition_number, log=False)
