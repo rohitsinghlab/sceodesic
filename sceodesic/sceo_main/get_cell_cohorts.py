@@ -13,6 +13,7 @@ from annoy import AnnoyIndex
 # package-specific imports 
 from ..utils import fn_timer
 from .default_keys import *
+from ..helper import reassign_clusters
 
 CLUSTER_NUM_NEIGHBORS = 5
 
@@ -102,6 +103,16 @@ def _get_cell_cohorts(adata, num_clusters, stratify_cols, num_hvg,
         kmeans = KMeans(n_clusters=group_num_clusters, n_init=n_init)
         kmeans.fit(X_dimred)
         print(f"Fitting done k means with {group_num_clusters} clusters for stratification group {idx+1} '{strat_desc}'")
+        
+        print("flag 269: number of kmeans components:", len(kmeans.cluster_centers_))
+
+        # reassign small clusters (< 10) and update number of clusters
+        kmeans = reassign_clusters(X_dimred, kmeans, 10)
+        group_num_clusters = len(kmeans.cluster_centers_)
+
+        print("flag 273: number kmeans components after reassigning small clusters:", len(kmeans.cluster_centers_))
+
+        # get cluster assignments
         kmeans_cluster_assignments = kmeans.labels_
         
         if save_extra_info:
