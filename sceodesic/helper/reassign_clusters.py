@@ -5,7 +5,7 @@ from collections import Counter
 from sklearn.cluster import KMeans
 
 
-def reassign_clusters(data, kmeans, min_size):
+def reassign_clusters(data, kmeans, min_size, rct=0):
 
     print("flag 270: reassigning clusters")
 
@@ -16,6 +16,9 @@ def reassign_clusters(data, kmeans, min_size):
 
     print("flag 270.5: number of small clusters:", len(small_clusters))
 
+    # we shouldn't ever have more than one recursion 
+    assert rct < 2
+    
     if len(small_clusters) == 0:
         return kmeans
 
@@ -32,4 +35,4 @@ def reassign_clusters(data, kmeans, min_size):
 
     new_kmeans = KMeans(ngood, init=good_centers, max_iter=1)
     new_kmeans.fit(data)
-    return reassign_clusters(data, new_kmeans, min_size)
+    return reassign_clusters(data, new_kmeans, min_size, rct+1)
