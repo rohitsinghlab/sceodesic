@@ -5,6 +5,8 @@ import scanpy as sc
 import numpy as np
 import pandas as pd
 
+import scipy.sparse
+
 from .get_cell_cohorts import get_cell_cohorts
 from .get_locally_variable_genes import get_locally_variable_genes
 from .estimate_covariances import estimate_covariances 
@@ -17,13 +19,16 @@ from .default_keys import *
 from ..utils import fn_timer
 from ..utils import order_by_second_moment
 
+from ..helper import compute_soft_embeddings
+
 
 @fn_timer
 def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03, 
              max_condition_number=50, stratify_cols='none', 
              num_hvg_per_cohort=100, pvd_pct=0.9, do_global_hvg=False, 
              cohort_assn=None, top_genes=None,
-             copy=False, n_init=1, key_added=None, uns_key=None):
+             copy=False, n_init=1, key_added=None, uns_key=None, soft=False, 
+             soft_kernel_func=None, **kwargs):
     """
     Computes sceodesic embeddings and saves them in adata.obsm[key_added], 
     sceodesic programs are stored in adata.obsm[key_added],
@@ -121,7 +126,7 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     
     :returns: a copy of adata if copy=True, else modifies adata in place and returns None. 
     """
-    
+
     if key_added is None:
         obsm_key_added = SCEO_EMBEDDINGS_KEY
         varm_key_added = MODULES_KEY
@@ -136,6 +141,9 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
         adata = adata.copy()
         
     adata.uns[uns_key] = {}
+    
+    # will need clustering results if we're making soft assignments
+    clustering_results_dict = None
      
     # can give cohort_assn or top_genes optionally
     if cohort_assn is not None and top_genes is None:
@@ -146,7 +154,8 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
     elif cohort_assn is None and top_genes is not None:
         num_hvg = len(top_genes)
-        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
+        # if soft, we'll need the clustering results
+        clustering_results_dict = get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key, return_results=soft)
         estimate_covariances(adata, max_condition_number, pvd_pct, top_genes=top_genes, uns_key=uns_key)
     elif cohort_assn is not None and top_genes is not None:
         num_cohorts = len(np.unique(cohort_assn))
@@ -162,7 +171,8 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
                        " or input your own list of genes of interest.")
             print(message, file=sys.stderr)
             raise e
-        get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key)
+        # if soft, we'll need the clustering results
+        clustering_results_dict = get_cell_cohorts(adata, num_cohorts, stratify_cols, num_hvg, n_init=n_init, uns_key=uns_key, return_results=soft)
         get_locally_variable_genes(adata, num_hvg, num_hvg_per_cohort, do_global_hvg, uns_key=uns_key)
         estimate_covariances(adata, max_condition_number, pvd_pct, uns_key=uns_key)
     
@@ -183,11 +193,18 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
     
     # making the .obsm object 
     observation_count = adata.n_obs    
-    data_embedding = np.zeros((observation_count, num_hvg))
-    for i, embed in embeddings.items():
-        cluster_indices = cell2cluster[i]
-        for cell in cluster_indices:
-            data_embedding[cell, :] = embed
+    if soft:
+        data_embedding = compute_soft_embeddings(num_hvg,
+                                                 clustering_results_dict,
+                                                 soft_kernel_func, 
+                                                 embeddings, 
+                                                 **kwargs)
+    else:
+        data_embedding = np.zeros((observation_count, num_hvg))
+        for label, embed in embeddings.items():
+            clusteridx = cell2cluster[label]
+            cluster_sz = len(clusteridx)
+            data_embedding[clusteridx] = np.tile(embed, cluster_sz).reshape((cluster_sz, num_hvg))
             
     data_embedding, modules = order_by_second_moment(data_embedding, modules)
     
@@ -220,3 +237,4 @@ def run_sceo(adata, num_hvg=-1, num_cohorts='auto', sparse_pca_lambda=0.03,
 
     if copy:
         return adata
+    

@@ -47,6 +47,9 @@ def _reconstruct_programs(adata, sparse_pca_lambda, embedding_filename=None,
     
     if uns_key is None:
         uns_key = UNS_KEY
+
+    if uns_key not in adata.uns:
+        adata.uns[uns_key] = {}
     
     if embeddings_dict_key is None:
         embeddings_dict_key = EMBEDDINGS_DICT_KEY 
@@ -70,7 +73,22 @@ def _reconstruct_programs(adata, sparse_pca_lambda, embedding_filename=None,
         S,U = np.linalg.eigh(current_covariance)
         cluster_eigendecomposition[cluster_index] = [S,U]
 
-    all_eigenvectors_horizontal = np.vstack([cluster_eigendecomposition[cluster_index][1][:, :cluster_var_count[cluster_index]].T for cluster_index in cluster_eigendecomposition])
+    #### old code ####
+    #### bug: taking least varied components, not most varied ####
+    ### all_eigenvectors_horizontal = np.vstack([cluster_eigendecomposition[cluster_index][1][:, :cluster_var_count[cluster_index]].T for cluster_index in cluster_eigendecomposition])
+    #### old code ####
+
+    # new code: take most-varied components
+    all_eigenvectors_horizontal = np.vstack([cluster_eigendecomposition[cluster_index][1][:, -cluster_var_count[cluster_index]:].T for cluster_index in cluster_eigendecomposition])
+    ## done another way:
+    #all_eigenvectors_horizontal = []
+    #for cluster_index in cluster_eigendecomposition:
+        #_, U = cluster_eigendecomposition[cluster_index]
+        #ncomps = cluster_var_count[cluster_index]
+        ## columns are eigenvectors, sorted in ascending order of eigenvalues
+        #all_eigenvectors_horizontal.append(U[:, -ncomps:].T)
+    ## transpose so that eigenvectors are horizontal
+    #all_eigenvectors_horizontal = np.vstack(all_eigenvectors_horizontal)
 
     print("Concatenated eigenvectors matrix: ", all_eigenvectors_horizontal.shape)
     print(np.allclose(all_eigenvectors_horizontal, all_eigenvectors_horizontal.real))
@@ -90,7 +108,9 @@ def _reconstruct_programs(adata, sparse_pca_lambda, embedding_filename=None,
     embeddings = {}
     for cluster_index in cluster_eigendecomposition:
         sigma_i = covariance_matrices[cluster_index]
-        M_star = sparse_pca_eigenvectors.T @ scipy.linalg.logm(sigma_i)  @ sparse_pca_eigenvectors
+        # M_star = sparse_pca_eigenvectors.T @ scipy.linalg.logm(sigma_i) @ sparse_pca_eigenvectors
+        # The eigenvectors are the rows of sparse_pca_eigenvectors
+        M_star = sparse_pca_eigenvectors @ scipy.linalg.logm(sigma_i) @ sparse_pca_eigenvectors.T
         diagonal = np.diagonal(M_star)
         embedding = diagonal 
         embeddings[cluster_index] = embedding
