@@ -124,6 +124,7 @@ def _reconstruct_programs(adata, sparse_pca_lambda, embedding_filename=None,
     # write to adata.uns
     adata.uns[uns_key][embeddings_dict_key] = results_embedding["embedding_dictionary"]
     adata.uns[uns_key][modules_key] = results_embedding["modules"]
+    adata.uns[uns_key]['cluster_svd'] = results_embedding["cluster_svd"]
         
     out = ()
     if copy:
