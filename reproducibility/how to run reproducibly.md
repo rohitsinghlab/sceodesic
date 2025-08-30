@@ -2,7 +2,7 @@
 2. install singhlab package from `https://github.com/rohitsinghlab/singhlab-main`
 3. use python code as follows:
 
-```
+```python
 from singhlab.utils.decorators import run_with_seed
 from sceodesic import run_sceo
 
