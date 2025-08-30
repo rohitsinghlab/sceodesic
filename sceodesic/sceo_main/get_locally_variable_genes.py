@@ -79,7 +79,7 @@ def _get_locally_variable_genes(adata, num_hvg, num_hvg_per_cluster, global_hvg,
             hvg_count_vec += np.where(hvgs, 1, 0)
 
         # select the indices of the first num_hvg highest values in hvg_count_vec
-        top_gene_idxs =  np.argsort(hvg_count_vec)[-num_hvg:]
+        top_gene_idxs =  np.argsort(hvg_count_vec, kind="stable")[-num_hvg:]
         top_gene_names = adata.var_names[top_gene_idxs]
         
     if hvg_filename:
